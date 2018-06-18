@@ -33,3 +33,8 @@ data.frame( x = xp,
             y = Xp %*% coef(mod.1) )
 p + geom_line(data = data.frame( x = xp,
                                  y = Xp %*% coef(mod.1) ), aes(x, y))
+
+
+#------ GAMMs with R
+data("sole")
+

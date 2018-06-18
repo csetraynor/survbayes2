@@ -4,7 +4,7 @@
 \alias{plot_km}
 \title{Kaplan and Meier estimates}
 \usage{
-plot_km(d, time = time, status = status, event_type = 1, strata = "1")
+plot_km(dat, time = time, status = status, event_type = 1, strata = "1")
 }
 \arguments{
 \item{d}{a dataset \cr
