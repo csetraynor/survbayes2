@@ -23,6 +23,17 @@ plot_km <- function(dat, time = time, status = status, event_type = 1, strata = 
   ggplot2::ggplot(obs.mortality, aes(time, surv)) +
     geom_step()
 }
+
+#' Generate data for stan
+#'
+#' This function generates a long format dataframe for
+#' repeated tte, time dependent covariates.
+#'
+#' @param d a dataset \cr
+#' @return d a long dataset
+#' @export
+#' @importFrom rlang !!
+#' @importFrom magrittr %>%
 gen_stan_dat <- function(dat, status = "status", time = "time", timepoints = T) {
   # prepare for longdat formating
   dat$sample_id <- 1:nrow(dat)  #create sample id
@@ -33,7 +44,6 @@ gen_stan_dat <- function(dat, status = "status", time = "time", timepoints = T) 
     times <- dat[dat[[status]], ]
     times <- times[order(unique(unlist(times[, time]))), time]
   }
-
   form <- as.formula(paste0("Surv(", time, " ,", status, " )", "~."))
   longdat <- survival::survSplit(form, data = dat, cut = times)
   # create time point id
@@ -41,12 +51,26 @@ gen_stan_dat <- function(dat, status = "status", time = "time", timepoints = T) 
   # calculate log duration for off-set variable
   longdat$dtime <- longdat[time] - longdat[["tstart"]]
   longdat$log_dtime <- as.double( unlist( log(longdat$dtime) ) )
-
   longdat
-
-  # stan_data <- list(N = nrow(longdata), S =
-  # dplyr::n_distinct(longdata$sample), T = length(times), s =
-  # array(as.numeric(longdata$s)), t = array(longdata$t), event =
-  # array(longdata$deceased), t_obs = array(longdata$os_months), t_dur =
-  # array(longdata$t_dur)) stan_data
 }
+#' String method for strata in surv analysis
+#'
+#' This function is a string method to facilitate ploting.
+#'
+#' @param c a character frame \cr
+#' @return d a clean dataset
+#' @export
+#' @importFrom magrittr %>%
+str_strata <- function(c){
+  test <- strsplit(as.character( c$strata ), "\\,")
+  test <-as_data_frame( do.call(rbind, test) )
+  colnames(test) <- gsub("=.*| ","",  test[1, ] ) 
+  strata_replace <- function(x){
+    x <- gsub(".*=| ", "", x) 
+    x
+  }
+  test <- test %>%
+    dplyr::mutate_all(funs(strata_replace))
+  test
+}
+
