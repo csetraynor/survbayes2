@@ -74,3 +74,28 @@ str_strata <- function(c){
   test
 }
 
+#' Expand dataset accordin to calendar time
+#'
+#' @param dat a data frame \cr
+#' @return d a long dataset
+#' @export
+#' @importFrom magrittr %>%
+gen_new.frame <- function(dat, time = "time", id = "patient_id", timepoints){
+
+  
+  data_cal <- lapply(seq_along( dat[[id]] ), function(x) {
+    id_sq <- rep(x, length(timepoints) - 1)
+    dat.list <- data.frame(t_start = timepoints[-length(timepoints)],
+                           time = timepoints[-1],
+                      sample_id = id_sq) 
+    dat.list$dtime <- dat.list$time - dat.list$t_start;
+    dat.list$log_dtime <- log(dat.list$dtime)
+      
+    test_data <- dat[ ,!grepl(time, colnames(dat))]
+    merge(dat.list, test_data[x, ], sort = FALSE)
+  }
+  )
+  do.call(rbind, data_cal)
+}
+
+
