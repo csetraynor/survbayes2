@@ -51,10 +51,8 @@ tdbrier <- function(data, mod,...)
 #' @rdname tdbrier
 
 get_tdbrier <-
-  function(data, mod, form,  ...) {
+  function(data, mod,  ...) {
     x <- rsample::analysis(data)
-
-    X <- x[,form$feature]
 
     features <- names(mod$coefficients)
 

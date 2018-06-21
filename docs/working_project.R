@@ -29,6 +29,13 @@ m1.gam <- mgcv::gam(status ~ 1 + offset(log_dtime) + s(time) + factor(chemothera
 m1.stan_gam <- rstanarm::stan_gamm4(status~1+offset(log_dtime)+s(time) + factor(chemotherapy), data = long_ic2dat , family='poisson')
 summary(m1.stan_gam)
 
+m1.stan_gam_code <- get_stancode(m1.stan_gam$stanfit)
+myprint<- function(somestring,idelimit=100) {
+  for(i in seq(1,nchar(somestring),idelimit+1)) {
+    print(substr(somestring,i,i+idelimit));
+  }
+}
+myprint(m1.stan_gam_code)
 #plot predictions
 post <- posterior_linpred(m1.stan_gam)
 

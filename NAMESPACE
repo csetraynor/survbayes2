@@ -2,11 +2,13 @@
 
 export(gen_new.frame)
 export(gen_stan_dat)
+export(get_brier_bGAMM)
 export(get_plot.frame)
 export(get_tdbrier)
 export(integrate_tdbrier)
 export(integrate_tdbrier_reference)
 export(link.surv)
+export(mod_coxfit)
 export(plot_km)
 export(pred_surv)
 export(str_strata)

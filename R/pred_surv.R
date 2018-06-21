@@ -22,7 +22,7 @@ pred_surv <- function(post, longdata){
 }
 
 get_survProb <- function(newdat, time = "time", surv_mean = "surv_mean",
-                         patient_id = "patient_id"){
+                         patient_id = "sample_id"){
   test <- newdat[, grepl(paste(c(time, surv_mean, patient_id), collapse = "|"), colnames(newdat))] 
                  
   probs <- split(test, as.factor(test[[patient_id]]) ) %>%
