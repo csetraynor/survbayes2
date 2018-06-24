@@ -73,8 +73,8 @@ mc_samp$mod_clin_gen_cox <- pmap(list(mc_samp$splits),
 mc_samp$mod_clin_gen_treat_cox <- pmap(list(mc_samp$splits),
                              function(data){
                                mod_coxfit(x = data,
-                                          surv_form = c( iclust2_features_wt$feature, "chemotherapy*radio_therapy", "mastectomy", "hormone_therapy"),
-                                          inits = c(iclust2_features_wt$coef,rep(0,3) )
+                                          surv_form = c( iclust2_features$feature, "mastectomy", "hormone_therapy"),
+                                          inits = c(iclust2_features$coef,rep(0,2) )
                                )
                              })
 
@@ -98,35 +98,6 @@ mc_samp$brier_gen_treat_cox <- pmap(list(mc_samp$splits, mc_samp$mod_clin_gen_tr
                                 get_tdbrier(data = data,
                                             mod = model)
                               })
-
-# Get Brier Bayesian Model -------------------
-
-genomic_features <- iclust2_features$feature[-match(c("age_std", "npi"), iclust2_features$feature)]
-
-genomic_prior <- c(set_prior(horseshoe(df = 3, par_ratio = 0.1)))
-mc_samp$mod_clin_bayes <- pmap(list(mc_samp$splits),
-                               function(data){
-                                 get_brier_bGAMM(x = data,
-                                                 surv_form = c("age_std", "npi")
-
-                                 )
-                               })
-
-mc_samp$mod_clin_gen_bayes <- pmap(list(mc_samp$splits),
-                                 function(data){
-                                   get_brier_bGAMM(x = data,
-                                              surv_form = iclust2_features$feature,
-                                              prior = genomic_prior
-                                   )
-                                 })
-mc_samp$mod_clin_gen_treat_bayes <- pmap(list(mc_samp$splits),
-                                       function(data){
-                                         get_brier_bGAMM(x = data,
-                                                    surv_form = c( iclust2_features_wt$feature, "chemotherapy*radio_therapy", "mastectomy", "hormone_therapy"),
-                                                    prior = genomic_prior
-                                         )
-                                       })
-
 
 
 ###integrate Brier
@@ -194,3 +165,32 @@ ibrier_Tab <- ibrier_Tab %>% mutate_all(my_round)
 pdf("MC_Results.pdf", 7 ,5)
 grid.arrange(pdf, compare, nrow = 1)
 dev.off()
+
+
+# Bayesian Model -------------------
+
+genomic_features <- iclust2_features$feature[-match(c("age_std", "npi"), iclust2_features$feature)]
+
+genomic_prior <- c(set_prior(horseshoe(df = 3, par_ratio = 0.1)))
+mc_samp$mod_clin_bayes <- pmap(list(mc_samp$splits),
+                               function(data){
+                                 get_brier_bGAMM(x = data,
+                                                 surv_form = c("age_std", "npi")
+                                                 
+                                 )
+                               })
+
+mc_samp$mod_clin_gen_bayes <- pmap(list(mc_samp$splits),
+                                   function(data){
+                                     get_brier_bGAMM(x = data,
+                                                     surv_form = iclust2_features$feature,
+                                                     prior = genomic_prior
+                                     )
+                                   })
+mc_samp$mod_clin_gen_treat_bayes <- pmap(list(mc_samp$splits),
+                                         function(data){
+                                           get_brier_bGAMM(x = data,
+                                                           surv_form = c( iclust2_features_wt$feature, "chemotherapy*radio_therapy", "mastectomy", "hormone_therapy"),
+                                                           prior = genomic_prior
+                                           )
+                                         })
