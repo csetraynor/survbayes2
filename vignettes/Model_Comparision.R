@@ -128,9 +128,8 @@ int_brier %>%
   geom_line(stat = "density") +
   theme_bw() +
   theme(legend.position = "top")
-
-int_brier <- perf_mod(int_brier, seed = 6507, iter = 5000, transform = logit_trans,
-                      hetero_var = TRUE)
+library(tidyposterior)
+int_brier <- perf_mod(int_brier, seed = 6507, iter = 5000, transform = logit_trans)
 
 pdf <- ggplot(tidy(int_brier)%>%
                 filter(model != "Reference")) +

@@ -1,3 +1,46 @@
+#' Posterior Hazard
+#'
+#'
+#' Bayesian semiparametric survival model with GAMM
+#'
+#' @param x data
+#' @param surv_mod vector with covariates
+#' @return mod
+#' @seealso [coxph]
+#' @keywords coxph
+#'
+#' @author Carlos S Traynor
+#' @references
+#'
+#'  Terry M. Therneau and Patricia M. Grambsch (2000).
+#'   Modeling Survival Data: Extending the Cox Model.
+#'   Springer, New York. ISBN 0-387-98784-3.
+#'@export post_surv
+
+post_surv <- function(x, surv_form, prior = NULL, ...) {
+  
+  form <- as.formula( paste0(c( "status~1+offset(log_dtime)+s(time)+", paste(surv_form, collapse = "+")), collapse = ""))
+  
+  #prepare long format dataset
+  long_x <- gen_stan_dat(x)
+  
+  if(is.list(prior)){
+    m1.stan_gam <- brms::brm(brms::bf(form),
+                             data = long_x, family = poisson(),  seed = 17,
+                             iter = 12400, warmup = 1000, thin = 10, 
+                             control = list(adapt_delta = 0.99),
+                             prior = prior)
+  } else {
+    m1.stan_gam <- rstanarm::stan_gamm4(form, data = long_x , family= poisson(),
+                                        seed = 17,
+                                        iter = 12400, warmup = 1000, thin = 10, 
+                                        control = list(adapt_delta = 0.99))
+  }
+  return(m1.stan_gam)
+}
+
+
+
 #' Model fitting
 #'
 #'
@@ -15,29 +58,13 @@
 #'  Terry M. Therneau and Patricia M. Grambsch (2000).
 #'   Modeling Survival Data: Extending the Cox Model.
 #'   Springer, New York. ISBN 0-387-98784-3.
-#'@export get_brier_bGAMM
+#'@export get_ibrier_bm
 
-get_brier_bGAMM <- function(x, surv_form, prior = NULL, ...) {
+get_ibrier_bm <- function(x, surv_form, prior = NULL, ...) {
   x <- rsample::analysis(x)
 
-  form <- as.formula( paste0(c( "status~1+offset(log_dtime)+s(time)+", paste(surv_form, collapse = "+")), collapse = ""))
-  
-  #prepare long format dataset
-  long_x <- gen_stan_dat(x)
-  
-  if(is.list(prior)){
-    m1.stan_gam <- brms::brm(brms::bf(form),
-                             data = long_x, family = poisson(),  seed = 17,
-                             iter = 4000, warmup = 1000, thin = 10, 
-                             control = list(adapt_delta = 0.99),
-                             prior = prior)
-  } else {
-    m1.stan_gam <- rstanarm::stan_gamm4(form, data = long_x , family= poisson(),
-                                        seed = 17,
-                                        iter = 4000, warmup = 1000, thin = 10, 
-                                        control = list(adapt_delta = 0.99))
-  }
 
+  m1.stan_gam <- post_surv(x = x , surv_form = surv_form, prior = prior)
 
   timepoints <-  seq(0, max(x$time),
                      length.out = 100L)
@@ -57,6 +84,5 @@ get_brier_bGAMM <- function(x, surv_form, prior = NULL, ...) {
                     exact = FALSE,
                     exactness = 99L)
   brier
-  
 }
   

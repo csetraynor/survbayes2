@@ -44,4 +44,32 @@ get_km.frame <- function(obs, strata ){
   obs.mortality 
 }
 
+#' Prepare plot with new dataframe
+#'
+#' This function prepares plot frame
+#'
+#' @param post posterior draws in matrix format \cr
+#' @param strata strata
+#' @param obs original dataframe defaults to ic2surv
+#' @return d a plot dataset
+#' @export
+#' @importFrom magrittr %>%
+get_plot_new_frame <- function(mod,newdat, timepoints, treatment){
+  post <- suppressWarnings(rstanarm::posterior_linpred(m1.map2stan, newdata = newdat))
+  
+  survdata <- apply(post, MARGIN = 1, get_survival_function)
+  
+  mean.surv <- apply(survdata, MARGIN = 1, mean)
+  mean.upper <- apply(survdata, 1, quantile, 0.945)
+  mean.lower <- apply(survdata, 1 , quantile, 0.055)
+  
+  bc.plot <- data.frame(
+    survmean = c(1, mean.surv),
+    survlower = c(1, mean.lower),
+    survupper = c(1, mean.upper),
+    time = c(0, newdat$timepoints)
+  ) %>%
+    dplyr::mutate(treatment = treatment)
+  bc.plot
+}
 

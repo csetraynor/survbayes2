@@ -98,4 +98,6 @@ gen_new.frame <- function(dat, time = "time", id = "patient_id", timepoints){
   do.call(rbind, data_cal)
 }
 
-
+get_survival_function  <- function(loghaz) {
+  exp( - cumsum(exp(loghaz))) 
+}
