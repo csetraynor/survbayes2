@@ -22,90 +22,321 @@ devtools::document()
 data("ic2surv")
 ?ic2surv
 
+#center variables
+ic2surv$NGF_centered <- ic2surv$NGF - mean(ic2surv$NGF)
+ic2surv$MAP1B_centered <- ic2surv$MAP1B - mean(ic2surv$MAP1B)
+
 ic2surv <- ic2surv %>%
     dplyr::mutate(mastectomy = breast_surgery == "MASTECTOMY",
                 crtherapy = (chemotherapy == "YES" | radio_therapy == "YES"),
                 chemotherapy = chemotherapy == "YES",
                 radio_therapy = radio_therapy == "YES",
-                hormone_therapy = hormone_therapy == "YES")
+                hormone_therapy = hormone_therapy == "YES",
+                kras = ifelse(NGF_centered > 0, T, F),
+                lef1 = ifelse(MAP1B_centered > 0, T, F) )
   
 
 #prepare long format dataset
 long_ic2dat <- gen_stan_dat(ic2surv)
-m1.map2stan <- post_surv(x = ic2surv, surv_form = c("hormone_therapy", "mastectomy") )
+m1.map2stan <- post_surv(x = ic2surv, surv_form = c("kras", "mastectomy", "kras:mastectomy") )
 
 summary(m1.map2stan)
 
 
 #Conterfactual plot
 
-timepoints = seq(min(ic2surv$time), max(ic2surv$time), length.out = 1000)
+timepoints = seq(min(ic2surv$time), max(ic2surv$time), length.out = 100)
 dtime = c(0, diff(timepoints))
-mastectomy = c( rep(T, 1000), rep(F, 1000))
-hormone_therapy = c( rep(F, 1000), rep(T, 1000))
 bcdata <- data.frame(
   time = timepoints,
   log_dtime = log(dtime), 
   mastectomy = F,
-  hormone_therapy = T
+  kras = F
+)
+bchdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  mastectomy = F,
+  kras = T
 )
 masdata <- data.frame(
   time = timepoints,
   log_dtime = log(dtime), 
   mastectomy = T,
-  hormone_therapy = F
+  kras = F
+)
+mashdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  mastectomy = T,
+  kras = T
 )
 
-bc.plot.frame <- get_plot_new_frame(mod = m1.map2stan, newdat = bcdata, treatment = "Breast conservation with\n hormone therapy")
-mas.plot.frame <- get_plot_new_frame(mod = m1.map2stan, newdat = masdata, treatment = "Mastectomy without hormone therapy")
+bc.plot.frame <- get_plot_new_frame(mod = m1.map2stan, newdat = bcdata, treatment = "kras-, underwent breast conservation")
+bch.plot.frame <- get_plot_new_frame(mod = m1.map2stan, newdat = bchdata, treatment = "kras+, underwent breast conservation")
+mas.plot.frame <- get_plot_new_frame(mod = m1.map2stan, newdat = masdata, treatment = "kras-, underwent mastectomy")
+mash.plot.frame <- get_plot_new_frame(mod = m1.map2stan, newdat = mashdata, treatment = "kras+, underwent mastectomy")
 
 
-data.plot <- rbind(bc.plot.frame, mas.plot.frame)
+data.plot <- rbind(bc.plot.frame, mas.plot.frame, bch.plot.frame, mash.plot.frame)
 
-obs.mortality <- get_km.frame(ic2surv, strata = c("hormone_therapy", "mastectomy") )
+obs.mortality <- get_km.frame(ic2surv, strata = c("kras", "mastectomy") )
+obs.mortality$kras <- as.logical(obs.mortality$kras)
+obs.mortality$mastectomy <- as.logical(obs.mortality$mastectomy)
 
-pY <- ggplot2::ggplot(plot.frame ,
+obs.mortality <- obs.mortality %>% 
+  dplyr::mutate(Treatment = ifelse(kras & mastectomy, "kras+, underwent mastectomy", ifelse( !(kras) & (mastectomy), "kras-, underwent mastectomy", ifelse( kras &  !mastectomy, "kras+, underwent breast conservation", "kras-, underwent breast conservation"))))
+
+pp <- ggplot2::ggplot(data.plot %>%
+                        filter(Treatment == "kras+, underwent mastectomy" | Treatment == "kras+, underwent breast conservation") %>%
+                        mutate(Treatment = ifelse(Treatment == "kras+, underwent mastectomy", "mastectomy", "breast conservation") ),
                      aes(time, survmean,
-                         group = treatment, colour = treatment)) + 
-  geom_line(mapping=aes(group = treatment, colour = treatment),  alpha = 0.8) +
+                         group = Treatment, colour = Treatment)) + 
+  geom_line(mapping=aes(group = Treatment, colour = Treatment),  alpha = 0.8) +
   geom_ribbon(aes( ymin = survlower,
                    ymax = survupper,
-                   fill = treatment), alpha = 0.5, colour=NA) +
-  geom_step(data= obs.mortality %>% 
-              dplyr::mutate(treatment = ifelse(as.logical(hormone_therapy) & !as.logical(mastectomy), "Breast conservation with\n hormone therapy", ifelse(!as.logical(hormone_therapy) & as.logical(mastectomy), "Mastectomy without hormone therapy", "something else"))) %>%
-              filter(treatment != "something else"), aes(time,                                                                 surv,                                    colour = treatment),  alpha = 0.9)+
-  labs(title = "Bayesian Modeling of clinical outcome for iC-2",
-       subtitle = "Counterfactual plot by type of surgery and hormone-therapy",
-       caption = "4000 posterior samples") +
+                   fill = Treatment), alpha = 0.5, colour=NA) +
+  geom_step(data= obs.mortality %>%
+              filter(Treatment == "kras+, underwent mastectomy" | Treatment == "kras+, underwent breast conservation") %>%
+              mutate(Treatment = ifelse(Treatment == "kras+, underwent mastectomy", "mastectomy", "breast conservation") ), aes(time,                                                                 surv,                                    colour = Treatment),  alpha = 0.9)+
+  labs(title = "iC-2: kras + by type of surgery",
+       subtitle = "Survival counterfactual plot",
+       caption = "4400 posterior sample size") +
   theme(plot.title = element_text(hjust = 0.5)) +
   ylab("Survival probability") +
   xlab("Time (months)") +
-  theme_bw() + theme(legend.position=c(0.65, 0.85)) 
-pdf('counterfactual.pdf')
-pY
-dev.off()
+  theme_bw() + theme(legend.position=c(0.7, 0.92)) 
 
-
-pN <- ggplot2::ggplot(plot.frame %>% 
-                        dplyr::filter(!mastectomy),
-                      aes(time, postmean, group = hormone_therapy, colour = hormone_therapy)) + 
-  geom_line(mapping=aes(group = hormone_therapy, colour = hormone_therapy),  alpha = 0.8) +
-  geom_ribbon(aes( ymin = lower,
-                   ymax = upper,
-                   fill = hormone_therapy), alpha = 0.5, colour=NA) +
-  geom_step(data=obs.mortality %>%
-              
-              dplyr::filter(!as.logical(mastectomy)), aes(time,
-                                                         surv,
-                                                         colour = hormone_therapy),  alpha = 0.9)+
-  ggtitle("Practised breast conservation") +
+pn <- ggplot2::ggplot(data.plot %>%
+                        filter(Treatment == "kras-, underwent mastectomy" | Treatment == "kras-, underwent breast conservation") %>%
+                        mutate(Treatment = ifelse(Treatment == "kras-, underwent mastectomy", "mastectomy", "breast conservation") ),
+                      aes(time, survmean,
+                          group = Treatment, colour = Treatment)) + 
+  geom_line(mapping=aes(group = Treatment, colour = Treatment),  alpha = 0.8) +
+  geom_ribbon(aes( ymin = survlower,
+                   ymax = survupper,
+                   fill = Treatment), alpha = 0.5, colour=NA) +
+  geom_step(data= obs.mortality %>%
+              filter(Treatment == "kras-, underwent mastectomy" | Treatment == "kras-, underwent breast conservation") %>%
+              mutate(Treatment = ifelse(Treatment == "kras-, underwent mastectomy", "mastectomy", "breast conservation") ), aes(time,                                                                 surv,                                    colour = Treatment),  alpha = 0.9)+
+  labs(title = "iC-2: kras - by type of surgery",
+       subtitle = "Survival counterfactual plot",
+       caption = "4400 posterior sample size") +
   theme(plot.title = element_text(hjust = 0.5)) +
   ylab("Survival probability") +
   xlab("Time (months)") +
-  theme_bw() + theme(legend.position=c(0.75, 0.75))
-pN
+  theme_bw() + theme(legend.position=c(0.7, 0.92)) 
+
 require(gridExtra)
-pdf('HormoneRadioInteraction.pdf')
-grid.arrange(pN, pY, ncol=2)
+grid.arrange(pp, pn, ncol = 2)
+
+pdf('counterfactual_kras_surgery.pdf')
+grid.arrange(pp, pn, ncol = 2)
 dev.off()
 
+
+
+#prepare long format dataset
+long_ic2dat <- gen_stan_dat(ic2surv)
+m2.map2stan <- post_surv(x = ic2surv, surv_form = c("lef1", "mastectomy", "lef1:mastectomy") )
+
+summary(m2.map2stan)
+
+
+#Conterfactual plot
+
+timepoints = seq(min(ic2surv$time), max(ic2surv$time), length.out = 100)
+dtime = c(0, diff(timepoints))
+bcdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  mastectomy = F,
+  lef1 = F
+)
+bchdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  mastectomy = F,
+  lef1 = T
+)
+masdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  mastectomy = T,
+  lef1 = F
+)
+mashdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  mastectomy = T,
+  lef1 = T
+)
+
+bc.plot.frame <- get_plot_new_frame(mod = m2.map2stan, newdat = bcdata, treatment = "lef1-, underwent breast conservation")
+bch.plot.frame <- get_plot_new_frame(mod = m2.map2stan, newdat = bchdata, treatment = "lef1+, underwent breast conservation")
+mas.plot.frame <- get_plot_new_frame(mod = m2.map2stan, newdat = masdata, treatment = "lef1-, underwent mastectomy")
+mash.plot.frame <- get_plot_new_frame(mod = m2.map2stan, newdat = mashdata, treatment = "lef1+, underwent mastectomy")
+
+
+data.plot <- rbind(bc.plot.frame, mas.plot.frame, bch.plot.frame, mash.plot.frame)
+
+obs.mortality <- get_km.frame(ic2surv, strata = c("lef1", "mastectomy") )
+obs.mortality$lef1 <- as.logical(obs.mortality$lef1)
+obs.mortality$mastectomy <- as.logical(obs.mortality$mastectomy)
+
+obs.mortality <- obs.mortality %>% 
+  dplyr::mutate(Treatment = ifelse(lef1 & mastectomy, "lef1+, underwent mastectomy", ifelse( !(lef1) & (mastectomy), "lef1-, underwent mastectomy", ifelse( lef1 &  !mastectomy, "lef1+, underwent breast conservation", "lef1-, underwent breast conservation"))))
+
+pp <- ggplot2::ggplot(data.plot %>%
+                        filter(Treatment == "lef1+, underwent mastectomy" | Treatment == "lef1+, underwent breast conservation") %>%
+                        mutate(Treatment = ifelse(Treatment == "lef1+, underwent mastectomy", "mastectomy", "breast conservation") ),
+                      aes(time, survmean,
+                          group = Treatment, colour = Treatment)) + 
+  geom_line(mapping=aes(group = Treatment, colour = Treatment),  alpha = 0.8) +
+  geom_ribbon(aes( ymin = survlower,
+                   ymax = survupper,
+                   fill = Treatment), alpha = 0.5, colour=NA) +
+  geom_step(data= obs.mortality %>%
+              filter(Treatment == "lef1+, underwent mastectomy" | Treatment == "lef1+, underwent breast conservation") %>%
+              mutate(Treatment = ifelse(Treatment == "lef1+, underwent mastectomy", "mastectomy", "breast conservation") ), aes(time,                                                                 surv,                                    colour = Treatment),  alpha = 0.9)+
+  labs(title = "iC-2: lef1 + by type of surgery",
+       subtitle = "Survival counterfactual plot",
+       caption = "4400 posterior sample size") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Survival probability") +
+  xlab("Time (months)") +
+  theme_bw() + theme(legend.position=c(0.7, 0.92)) 
+
+pn <- ggplot2::ggplot(data.plot %>%
+                        filter(Treatment == "lef1-, underwent mastectomy" | Treatment == "lef1-, underwent breast conservation") %>%
+                        mutate(Treatment = ifelse(Treatment == "lef1-, underwent mastectomy", "mastectomy", "breast conservation") ),
+                      aes(time, survmean,
+                          group = Treatment, colour = Treatment)) + 
+  geom_line(mapping=aes(group = Treatment, colour = Treatment),  alpha = 0.8) +
+  geom_ribbon(aes( ymin = survlower,
+                   ymax = survupper,
+                   fill = Treatment), alpha = 0.5, colour=NA) +
+  geom_step(data= obs.mortality %>%
+              filter(Treatment == "lef1-, underwent mastectomy" | Treatment == "lef1-, underwent breast conservation") %>%
+              mutate(Treatment = ifelse(Treatment == "lef1-, underwent mastectomy", "mastectomy", "breast conservation") ), aes(time,                                                                 surv,                                    colour = Treatment),  alpha = 0.9)+
+  labs(title = "iC-2: lef1 - by type of surgery",
+       subtitle = "Survival counterfactual plot",
+       caption = "4400 posterior sample size") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Survival probability") +
+  xlab("Time (months)") +
+  theme_bw() + theme(legend.position=c(0.7, 0.92)) 
+
+require(gridExtra)
+grid.arrange(pp, pn, ncol = 2)
+
+pdf('counterfactual_lef1_surgery.pdf')
+grid.arrange(pp, pn, ncol = 2)
+dev.off()
+
+
+
+
+
+#prepare long format dataset
+long_ic2dat <- gen_stan_dat(ic2surv)
+m3.map2stan <- post_surv(x = ic2surv, surv_form = c("kras", "hormone_therapy", "kras:hormone_therapy") )
+m4.map2stan <- post_surv(x = ic2surv, surv_form = c("kras", "radio_therapy", "kras:radio_therapy") )
+m5.map2stan <- post_surv(x = ic2surv, surv_form = c("kras", "chemotherapy", "kras:chemotherapy") )
+
+
+
+summary(m5.map2stan)
+summary(m5.map2stan)
+
+
+#Conterfactual plot
+
+timepoints = seq(min(ic2surv$time), max(ic2surv$time), length.out = 100)
+dtime = c(0, diff(timepoints))
+bcdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  chemotherapy = F,
+  kras = F
+)
+bchdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  chemotherapy = F,
+  kras = T
+)
+masdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  chemotherapy = T,
+  kras = F
+)
+mashdata <- data.frame(
+  time = timepoints,
+  log_dtime = log(dtime), 
+  chemotherapy = T,
+  kras = T
+)
+
+bc.plot.frame <- get_plot_new_frame(mod = m5.map2stan, newdat = bcdata, treatment = "kras-, underwent breast conservation")
+bch.plot.frame <- get_plot_new_frame(mod = m5.map2stan, newdat = bchdata, treatment = "kras+, underwent breast conservation")
+mas.plot.frame <- get_plot_new_frame(mod = m5.map2stan, newdat = masdata, treatment = "kras-, underwent chemotherapy")
+mash.plot.frame <- get_plot_new_frame(mod = m5.map2stan, newdat = mashdata, treatment = "kras+, underwent chemotherapy")
+
+
+data.plot <- rbind(bc.plot.frame, mas.plot.frame, bch.plot.frame, mash.plot.frame)
+
+obs.mortality <- get_km.frame(ic2surv, strata = c("kras", "chemotherapy") )
+obs.mortality$kras <- as.logical(obs.mortality$kras)
+obs.mortality$chemotherapy <- as.logical(obs.mortality$chemotherapy)
+
+obs.mortality <- obs.mortality %>% 
+  dplyr::mutate(Treatment = ifelse(kras & chemotherapy, "kras+, underwent chemotherapy", ifelse( !(kras) & (chemotherapy), "kras-, underwent chemotherapy", ifelse( kras &  !chemotherapy, "kras+, underwent breast conservation", "kras-, underwent breast conservation"))))
+
+pp <- ggplot2::ggplot(data.plot %>%
+                        filter(Treatment == "kras+, underwent chemotherapy" | Treatment == "kras+, underwent breast conservation") %>%
+                        mutate(Treatment = ifelse(Treatment == "kras+, underwent chemotherapy", "chemotherapy", "no chemotherapy") ),
+                      aes(time, survmean,
+                          group = Treatment, colour = Treatment)) + 
+  geom_line(mapping=aes(group = Treatment, colour = Treatment),  alpha = 0.8) +
+  geom_ribbon(aes( ymin = survlower,
+                   ymax = survupper,
+                   fill = Treatment), alpha = 0.5, colour=NA) +
+  geom_step(data= obs.mortality %>%
+              filter(Treatment == "kras+, underwent chemotherapy" | Treatment == "kras+, underwent breast conservation") %>%
+              mutate(Treatment = ifelse(Treatment == "kras+, underwent chemotherapy", "chemotherapy", "no chemotherapy") ), aes(time,                                                                 surv,                                    colour = Treatment),  alpha = 0.9)+
+  labs(title = "iC-2: kras + by type of surgery",
+       subtitle = "Survival counterfactual plot",
+       caption = "4400 posterior sample size") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Survival probability") +
+  xlab("Time (months)") +
+  theme_bw() + theme(legend.position=c(0.7, 0.92)) 
+
+pn <- ggplot2::ggplot(data.plot %>%
+                        filter(Treatment == "kras-, underwent chemotherapy" | Treatment == "kras-, underwent breast conservation") %>%
+                        mutate(Treatment = ifelse(Treatment == "kras-, underwent chemotherapy", "chemotherapy", "no chemotherapy") ),
+                      aes(time, survmean,
+                          group = Treatment, colour = Treatment)) + 
+  geom_line(mapping=aes(group = Treatment, colour = Treatment),  alpha = 0.8) +
+  geom_ribbon(aes( ymin = survlower,
+                   ymax = survupper,
+                   fill = Treatment), alpha = 0.5, colour=NA) +
+  geom_step(data= obs.mortality %>%
+              filter(Treatment == "kras-, underwent chemotherapy" | Treatment == "kras-, underwent breast conservation") %>%
+              mutate(Treatment = ifelse(Treatment == "kras-, underwent chemotherapy", "chemotherapy", "no chemotherapy") ), aes(time,                                                                 surv,                                    colour = Treatment),  alpha = 0.9)+
+  labs(title = "iC-2: kras - by type of surgery",
+       subtitle = "Survival counterfactual plot",
+       caption = "4400 posterior sample size") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ylab("Survival probability") +
+  xlab("Time (months)") +
+  theme_bw() + theme(legend.position=c(0.7, 0.92)) 
+
+require(gridExtra)
+grid.arrange(pp, pn, ncol = 2)
+
+pdf('counterfactual_kras_surgery.pdf')
+grid.arrange(pp, pn, ncol = 2)
+dev.off()

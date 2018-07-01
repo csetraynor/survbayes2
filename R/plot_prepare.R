@@ -55,7 +55,7 @@ get_km.frame <- function(obs, strata ){
 #' @export
 #' @importFrom magrittr %>%
 get_plot_new_frame <- function(mod,newdat, timepoints, treatment){
-  post <- suppressWarnings(rstanarm::posterior_linpred(m1.map2stan, newdata = newdat))
+  post <- suppressWarnings(rstanarm::posterior_linpred(mod, newdata = newdat))
   
   survdata <- apply(post, MARGIN = 1, get_survival_function)
   
@@ -67,9 +67,9 @@ get_plot_new_frame <- function(mod,newdat, timepoints, treatment){
     survmean = c(1, mean.surv),
     survlower = c(1, mean.lower),
     survupper = c(1, mean.upper),
-    time = c(0, newdat$timepoints)
+    time = c(0, newdat$time)
   ) %>%
-    dplyr::mutate(treatment = treatment)
+    dplyr::mutate(Treatment = treatment)
   bc.plot
 }
 

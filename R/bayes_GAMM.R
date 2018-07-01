@@ -17,7 +17,7 @@
 #'   Springer, New York. ISBN 0-387-98784-3.
 #'@export post_surv
 
-post_surv <- function(x, surv_form, prior = NULL, ...) {
+post_surv <- function(x, surv_form, prior = NULL, iter = 12000, ...) {
   
   form <- as.formula( paste0(c( "status~1+offset(log_dtime)+s(time)+", paste(surv_form, collapse = "+")), collapse = ""))
   
@@ -27,13 +27,13 @@ post_surv <- function(x, surv_form, prior = NULL, ...) {
   if(is.list(prior)){
     m1.stan_gam <- brms::brm(brms::bf(form),
                              data = long_x, family = poisson(),  seed = 17,
-                             iter = 12400, warmup = 1000, thin = 10, 
+                             iter = iter, warmup = 1000, thin = 10, 
                              control = list(adapt_delta = 0.99),
                              prior = prior)
   } else {
     m1.stan_gam <- rstanarm::stan_gamm4(form, data = long_x , family= poisson(),
                                         seed = 17,
-                                        iter = 12400, warmup = 1000, thin = 10, 
+                                        iter = iter, warmup = 1000, thin = 10, 
                                         control = list(adapt_delta = 0.99))
   }
   return(m1.stan_gam)

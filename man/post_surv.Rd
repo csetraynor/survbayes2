@@ -4,7 +4,7 @@
 \alias{post_surv}
 \title{Posterior Hazard}
 \usage{
-post_surv(x, surv_form, prior = NULL, ...)
+post_surv(x, surv_form, prior = NULL, iter = 12000, ...)
 }
 \arguments{
 \item{x}{data}

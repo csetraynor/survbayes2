@@ -2,8 +2,10 @@
 
 export(gen_new.frame)
 export(gen_stan_dat)
+export(get_cindex)
 export(get_ibrier_bm)
 export(get_plot.frame)
+export(get_plot_new_frame)
 export(get_tdbrier)
 export(integrate_tdbrier)
 export(integrate_tdbrier_reference)
