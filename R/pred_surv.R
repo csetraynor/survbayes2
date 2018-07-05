@@ -21,13 +21,12 @@ pred_surv <- function(post, longdata){
   as.matrix(post.matrix)
 }
 
-get_survProb <- function(newdat, time = "time", surv_mean = "surv_mean",
-                         patient_id = "sample_id"){
-  test <- newdat[, grepl(paste(c(time, surv_mean, patient_id), collapse = "|"), colnames(newdat))] 
+get_survProb <- function(newdat, time = "time", surv = "surv", patient_id = "sample_id"){
+  test <- newdat[, grepl(paste(c(time, surv, patient_id), collapse = "|"), colnames(newdat))] 
                  
   probs <- split(test, as.factor(test[[patient_id]]) ) %>%
     Reduce(function(dtf1,dtf2) full_join(dtf1, dtf2, by= time), .) %>%
-    select(contains(surv_mean)) %>%
+    select(contains(surv)) %>%
     as.matrix() 
   probs <- t(probs)
   probs <- cbind( rep(1, nrow(probs) ), probs) 

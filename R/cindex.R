@@ -36,10 +36,21 @@ get_cindex <- function(data, mod,...)
 #' @export
 #' @rdname get_cindex
 get_cindex <-
-  function(data, mod, ...) {
-    pred_dat <- assessment(data)
-    pred_dat$pred <- predict(mod, newdata = pred_dat)
-    survival::survConcordance(Surv(time, status) ~ pred, pred_dat, ...)$concordance
+  function(x, mod, ...) {
+    
+    train_data <- rsample::analysis(x)
+    
+    timepoints <-  seq(0, max(train_data$time),
+                       length.out = 100L)
+    
+    test_data <- rsample::assessment(x)
+    
+    
+    tail(suppressWarnings(suppressMessages( (pec::cindex(mod, 
+                                        Surv(time, status) ~ 1,
+                                        data = test_data,
+                                    pred.times = timepoints,
+               eval.times = timepoints))))$AppCindex$coxph , n=1)
   }
 
 
