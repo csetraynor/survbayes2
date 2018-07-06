@@ -47,16 +47,25 @@ iclust2_features_wt$feature <- iclust2prog::my_replace(iclust2_features_wt$featu
 ############ Survival analysis vignette
 
 data("ic2surv")
+#center variables
+ic2surv$NGF_centered <- ic2surv$NGF - mean(ic2surv$NGF)
+ic2surv$MAP1B_centered <- ic2surv$MAP1B - mean(ic2surv$MAP1B)
+
 ic2surv <- ic2surv %>%
   dplyr::mutate(mastectomy = breast_surgery == "MASTECTOMY",
-                crtherapy = (chemotherapy == "YES" | radio_therapy == "YES") )
+                crtherapy = (chemotherapy == "YES" | radio_therapy == "YES"),
+                chemotherapy = chemotherapy == "YES",
+                radio_therapy = radio_therapy == "YES",
+                hormone_therapy = hormone_therapy == "YES",
+                kras = ifelse(NGF_centered > 0, T, F),
+                lef1 = ifelse(MAP1B_centered > 0, T, F) )
 set.seed(9666)
 mc_samp <- mc_cv(ic2surv, strata =  "status", times = 200)
 
 cens_rate <- function(x) mean(analysis(x)$status == 1)
 summary(map_dbl(mc_samp$splits, cens_rate))
 
-############### Create models
+# Fit Cox models --------------------
 mc_samp$mod_clin_cox <- pmap(list(mc_samp$splits),
                             function(data){
                               mod_coxfit(x = data,
@@ -78,9 +87,15 @@ mc_samp$mod_clin_gen_treat_cox <- pmap(list(mc_samp$splits),
                                )
                              })
 
+# Fit Bayes models --------------------
+mc_samp$mod_clin_bym <- pmap(list(mc_samp$splits),
+                             function(splits){
+                               pred_sbm(x = splits,
+                                          surv_form = c( "age_std", "npi")
+                               )
+                             })
 
-
-############### Get Brier -------------
+############### Get Cox Brier -------------
 mc_samp$brier_clin_cox  <- pmap(list(mc_samp$splits, mc_samp$mod_clin_cox),
                                     function(data, model){
                                       get_tdbrier(data = data,

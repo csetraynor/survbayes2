@@ -4,7 +4,7 @@
 \alias{pred_sbm}
 \title{Prediction of survival from model}
 \usage{
-pred_sbm(x, surv_form, ...)
+pred_sbm(x, surv_form, prior = NULL, ...)
 }
 \arguments{
 \item{x}{data}

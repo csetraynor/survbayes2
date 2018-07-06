@@ -9,7 +9,6 @@
 #' @return d a clean dataset
 #' @export
 #' @importFrom rlang !!
-#' @import ggfortify
 #' @importFrom magrittr %>%
 plot_km <- function(dat, time = time, status = status, event_type = 1, strata = "1" ){
   time <- dplyr::enquo(time)

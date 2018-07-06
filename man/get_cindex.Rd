@@ -5,15 +5,15 @@
 \alias{get_cindex}
 \title{Get c-index}
 \usage{
-get_cindex(data, mod, ...)
+get_cindex(x, mod, ...)
 
-get_cindex(data, mod, ...)
+get_cindex(x, mod, ...)
 }
 \arguments{
+\item{mod}{Coxph model object fitted with coxph (survival).}
+
 \item{data}{For the default functions, a datframe containing survival
 (time), and status (0:censored/1:event), and the explanatory variables.}
-
-\item{mod}{Coxph model object fitted with coxph (survival).}
 }
 \value{
 A cindex object

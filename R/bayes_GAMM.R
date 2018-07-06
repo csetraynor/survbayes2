@@ -56,7 +56,7 @@ post_surv <- function(x, surv_form, prior = NULL, ...) {
 #'   Springer, New York. ISBN 0-387-98784-3.
 #'@export pred_sbm
 
-pred_sbm <- function(x, surv_form, ...) {
+pred_sbm <- function(x, surv_form, prior = NULL, ...) {
   train_data <- rsample::analysis(x)
   
   model.map2stan <- post_surv(x = train_data , surv_form = surv_form, prior = prior, iter = 12000, thin = 10, adapt_delta = 0.99)
