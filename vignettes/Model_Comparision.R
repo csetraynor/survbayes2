@@ -18,46 +18,49 @@ bric_data$mastectomy <-  bric_data$breast_surgery == "MASTECTOMY";
 bric_data$chemotherapy <-  bric_data$chemotherapy == "YES";
 bric_data$radio_therapy <- bric_data$radio_therapy == "YES";
 bric_data$hormone_therapy <- bric_data$hormone_therapy == "YES";
+bric_data$her2pos <- bric_data$her2_status == "+";
+bric_data$erpos <- bric_data$er_status == "+";
 #prepare time and status for pipeline
 bric_data$status <- bric_data$os_status == "DECEASED";
 bric_data$time <- bric_data$os_months
 #center variables
 bric_data$age_std <- bric_data$age_at_diagnosis - mean(bric_data$age_at_diagnosis) / sd(bric_data$age_at_diagnosis) 
 
+bric_data <- bric_data[, c("age_std", "npi", "mastectomy",
+                         "hormone_therapy", "chemotherapy", "radio_therapy",
+                         "her2pos", "erpos", "status", "time")]
+
 #create samples
 set.seed(9666)
 mc_samp <- mc_cv(bric_data, strata =  "status", times = 200)
 
-cens_rate <- function(x) mean(analysis(x)$status == 1)
-summary(map_dbl(mc_samp$splits, cens_rate))
-
+memory.size(50000)
 # Fit Cox models --------------------
 mc_samp$mod_clin_cox <- pmap(list(mc_samp$splits),
                              function(data){
                                mod_coxfit(x = data,
-                                          surv_form = '~ age_std + npi'
+                                          surv_form = '~ age_std + npi + mastectomy +
+                                          hormone_therapy + chemotherapy + radio_therapy +
+                                          her2pos + erpos'
                                )
                              })
-mc_samp$mod_clin_gen_cox <- pmap(list(mc_samp$splits),
+mc_samp$mod_gen_cox <- pmap(list(mc_samp$splits),
                                  function(data){
                                    mod_coxfit(x = data,
                                               surv_form = iclust2_features$feature,
                                               inits = iclust2_features$coef
                                    )
                                  })
-mc_samp$mod_clin_gen_treat_cox <- pmap(list(mc_samp$splits),
-                                       function(data){
-                                         mod_coxfit(x = data,
-                                                    surv_form = c( iclust2_features$feature, "mastectomy", "hormone_therapy"),
-                                                    inits = c(iclust2_features$coef,rep(0,2) )
-                                         )
-                                       })
 
 # Fit Bayes models --------------------
+#Create fit object 
+stan_model_object <- 
+
 mc_samp$mod_clin_bym <- pmap(list(mc_samp$splits),
                              function(splits){
                                pred_sbm(x = splits,
-                                        surv_form = c( "age_std", "npi")
+                                        surv_form = c( "age_std", "npi", "mastectomy",
+                                                       "hormone_therapy", "chemotherapy", "radio_therapy", "her2pos", "erpos")
                                )
                              })
 
