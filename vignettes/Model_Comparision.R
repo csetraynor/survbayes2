@@ -1,6 +1,7 @@
-if(!require("devtools")) install.packages("devtools")
-if(!require("survbayes2")) devtools::install_github("survbayes2")
-if(!require("iclust2prog")) devtools::install_github("iclust2prog")
+## Survival analysis vignette -------------------
+# if(!require("devtools")) install.packages("devtools")
+# if(!require("survbayes2")) devtools::install_github("survbayes2")
+# if(!require("iclust2prog")) devtools::install_github("iclust2prog")
 devtools::document()
 library(iclust2prog)
 library(rstan)
@@ -10,26 +11,22 @@ options(mc.cores = parallel::detectCores())
 ###Load data
 bric_data <- readRDS("E:/brca_data/bric_data.RDS")
 
-
-#Extract features, see my_replace in utils
-
+#Preprocess
 colnames(bric_data) <- my_replace(colnames(bric_data))
 
-############ Survival analysis vignette
-
-data("ic2surv")
+bric_data$mastectomy <-  bric_data$breast_surgery == "MASTECTOMY";
+bric_data$chemotherapy <-  bric_data$chemotherapy == "YES";
+bric_data$radio_therapy <- bric_data$radio_therapy == "YES";
+bric_data$hormone_therapy <- bric_data$hormone_therapy == "YES";
+#prepare time and status for pipeline
+bric_data$status <- bric_data$os_status == "DECEASED";
+bric_data$time <- bric_data$os_months
 #center variables
-ic2surv$NGF_centered <- ic2surv$NGF - mean(ic2surv$NGF)
-ic2surv$MAP1B_centered <- ic2surv$MAP1B - mean(ic2surv$MAP1B)
+bric_data$age_std <- bric_data$age_at_diagnosis - mean(bric_data$age_at_diagnosis) / sd(bric_data$age_at_diagnosis) 
 
-ic2surv <- ic2surv %>%
-  dplyr::mutate(mastectomy = breast_surgery == "MASTECTOMY",
-                chemotherapy = chemotherapy == "YES",
-                radio_therapy = radio_therapy == "YES",
-                hormone_therapy = hormone_therapy == "YES",
-                os_status = os_statu == "DECEASED")
+#create samples
 set.seed(9666)
-mc_samp <- mc_cv(ic2surv, strata =  "status", times = 200)
+mc_samp <- mc_cv(bric_data, strata =  "status", times = 200)
 
 cens_rate <- function(x) mean(analysis(x)$status == 1)
 summary(map_dbl(mc_samp$splits, cens_rate))
