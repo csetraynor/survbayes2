@@ -1,12 +1,23 @@
 Package: survbayes2
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Bayesian Survival Models (survbayes2)
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
+Author: Carlos Traynor
+Maintainer: Carlos Traynor <c.traynor@warwick.ac.uk>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
 License: GNU General Public License
 Encoding: UTF-8
 LazyData: true
+Depends: R (>= 3.4.2),
+		survival,
+		tidyverse,
+		rstanarm,
+		rstan
+Imports:purrr,
+		caret,
+		magrittr,
+		rlang,
+		glmnet,
+		pec		
 RoxygenNote: 6.0.1

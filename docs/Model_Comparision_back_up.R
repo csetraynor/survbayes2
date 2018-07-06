@@ -1,19 +1,48 @@
 if(!require("devtools")) install.packages("devtools")
-if(!require("survbayes2")) devtools::install_github("survbayes2")
 if(!require("iclust2prog")) devtools::install_github("iclust2prog")
-devtools::document()
+
+library(glmnet)
+library(purrr)
+library(dplyr)
+library(tidyr)
+library(rsample)
+# library(tidyposterior)
+library(gridExtra)
+library(bindrcpp)
 library(iclust2prog)
+theme_set(theme_bw())
+library(iclust2prog)
+library(predsurv)
+library(magrittr)
+library(dplyr)
+library(forcats)
+library(tidyr)
+library(purrr)
+library(modelr)
+library(tidybayes)
+library(ggplot2)
+library(ggstance)
+library(ggridges)
 library(rstan)
+library(rstanarm)
+library(survbayes2)
+import::from(LaplacesDemon, invlogit)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
+devtools::document()
 
 ###Load data
-bric_data <- readRDS("E:/brca_data/bric_data.RDS")
-
+data("ic2_lasso_gwt")
+data("iclust2_glmnet")
+#Plot glmnet fits
+glmnet::plot.cv.glmnet(ic2_lasso_gwt)
 
 #Extract features, see my_replace in utils
+iclust2_features <- extract_features(iclust2_glmnet)
+iclust2_features$feature <-my_replace(iclust2_features$feature)
 
-colnames(bric_data) <- my_replace(colnames(bric_data))
+iclust2_features_wt <- extract_features(ic2_lasso_gwt)
+iclust2_features_wt$feature <- iclust2prog::my_replace(iclust2_features_wt$feature)
 
 ############ Survival analysis vignette
 
@@ -24,10 +53,12 @@ ic2surv$MAP1B_centered <- ic2surv$MAP1B - mean(ic2surv$MAP1B)
 
 ic2surv <- ic2surv %>%
   dplyr::mutate(mastectomy = breast_surgery == "MASTECTOMY",
+                crtherapy = (chemotherapy == "YES" | radio_therapy == "YES"),
                 chemotherapy = chemotherapy == "YES",
                 radio_therapy = radio_therapy == "YES",
                 hormone_therapy = hormone_therapy == "YES",
-                os_status = os_statu == "DECEASED")
+                kras = ifelse(NGF_centered > 0, T, F),
+                lef1 = ifelse(MAP1B_centered > 0, T, F) )
 set.seed(9666)
 mc_samp <- mc_cv(ic2surv, strata =  "status", times = 200)
 
@@ -36,52 +67,52 @@ summary(map_dbl(mc_samp$splits, cens_rate))
 
 # Fit Cox models --------------------
 mc_samp$mod_clin_cox <- pmap(list(mc_samp$splits),
+                            function(data){
+                              mod_coxfit(x = data,
+                                    surv_form = '~ age_std + npi'
+                                    )
+                            })
+mc_samp$mod_clin_gen_cox <- pmap(list(mc_samp$splits),
+                         function(data){
+                           mod_coxfit(x = data,
+                                   surv_form = iclust2_features$feature,
+                                   inits = iclust2_features$coef
+                           )
+                         })
+mc_samp$mod_clin_gen_treat_cox <- pmap(list(mc_samp$splits),
                              function(data){
                                mod_coxfit(x = data,
-                                          surv_form = '~ age_std + npi'
+                                          surv_form = c( iclust2_features$feature, "mastectomy", "hormone_therapy"),
+                                          inits = c(iclust2_features$coef,rep(0,2) )
                                )
                              })
-mc_samp$mod_clin_gen_cox <- pmap(list(mc_samp$splits),
-                                 function(data){
-                                   mod_coxfit(x = data,
-                                              surv_form = iclust2_features$feature,
-                                              inits = iclust2_features$coef
-                                   )
-                                 })
-mc_samp$mod_clin_gen_treat_cox <- pmap(list(mc_samp$splits),
-                                       function(data){
-                                         mod_coxfit(x = data,
-                                                    surv_form = c( iclust2_features$feature, "mastectomy", "hormone_therapy"),
-                                                    inits = c(iclust2_features$coef,rep(0,2) )
-                                         )
-                                       })
 
 # Fit Bayes models --------------------
 mc_samp$mod_clin_bym <- pmap(list(mc_samp$splits),
                              function(splits){
                                pred_sbm(x = splits,
-                                        surv_form = c( "age_std", "npi")
+                                          surv_form = c( "age_std", "npi")
                                )
                              })
 
 ############### Get Cox Brier -------------
 mc_samp$brier_clin_cox  <- pmap(list(mc_samp$splits, mc_samp$mod_clin_cox),
-                                function(data, model){
-                                  get_tdbrier(data = data,
-                                              mod = model
-                                  )
-                                })
-mc_samp$brier_clin_gen_cox  <- pmap(list(mc_samp$splits, mc_samp$mod_clin_gen_cox),
                                     function(data, model){
                                       get_tdbrier(data = data,
                                                   mod = model
                                       )
                                     })
+mc_samp$brier_clin_gen_cox  <- pmap(list(mc_samp$splits, mc_samp$mod_clin_gen_cox),
+                            function(data, model){
+                              get_tdbrier(data = data,
+                                          mod = model
+                              )
+                            })
 mc_samp$brier_gen_treat_cox <- pmap(list(mc_samp$splits, mc_samp$mod_clin_gen_treat_cox),
-                                    function(data, model){
-                                      get_tdbrier(data = data,
-                                                  mod = model)
-                                    })
+                              function(data, model){
+                                get_tdbrier(data = data,
+                                            mod = model)
+                              })
 
 
 ###integrate Brier
