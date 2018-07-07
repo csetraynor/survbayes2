@@ -100,3 +100,10 @@ gen_new.frame <- function(dat, time = "time", id = "patient_id", timepoints){
 get_survival_function  <- function(loghaz) {
   exp( - cumsum(exp(loghaz))) 
 }
+
+my_replace <- function(x){
+  
+  x <- gsub("1-Sep", "Sep_1", x)
+  x <- gsub("\\-", "_", x)
+  gsub("`", "", x)
+}

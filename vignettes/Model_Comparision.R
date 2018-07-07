@@ -9,7 +9,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 ###Load data
-bric_data <- readRDS("E:/brca_data/bric_data.RDS")
+bric_data <- readRDS("/media/mtr/SeagateExpansionDrive/brca_data/bric_data.RDS")
 
 #Preprocess
 colnames(bric_data) <- my_replace(colnames(bric_data))
@@ -23,13 +23,14 @@ bric_data$erpos <- bric_data$er_status == "+";
 #prepare time and status for pipeline
 bric_data$status <- bric_data$os_status == "DECEASED";
 bric_data$time <- bric_data$os_months
+bric_data$time[bric_data$time == 0] <- 1e-3
 #center variables
 bric_data$age_std <- bric_data$age_at_diagnosis - mean(bric_data$age_at_diagnosis) / sd(bric_data$age_at_diagnosis) 
 
-bric_data <- bric_data[, c("age_std", "npi", "mastectomy",
-                         "hormone_therapy", "chemotherapy", "radio_therapy",
-                         "her2pos", "erpos", "status", "time")]
+bric_data_short <- bric_data[, c("age_std", "npi", "mastectomy",
+                         "hormone_therapy", "chemotherapy", "radio_therapy", "her2pos", "erpos", "status", "time")]
 
+devtools::use_data(bric_data_short)
 #create samples
 set.seed(9666)
 mc_samp <- mc_cv(bric_data, strata =  "status", times = 200)
