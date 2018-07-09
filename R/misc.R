@@ -33,7 +33,7 @@ plot_km <- function(dat, time = time, status = status, event_type = 1, strata = 
 #' @export
 #' @importFrom rlang !!
 #' @importFrom magrittr %>%
-gen_stan_dat <- function(dat, status = "status", time = "time", timepoints = T) {
+gen_stan_surv <- function(dat, status = "status", time = "time", timepoints = T) {
   # prepare for longdat formating
   dat$sample_id <- 1:nrow(dat)  #create sample id
   # get unique times: only event times equivalent to Cox model
