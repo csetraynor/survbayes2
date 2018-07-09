@@ -10,10 +10,9 @@ License: GNU General Public License
 Encoding: UTF-8
 LazyData: true
 Depends: R (>= 3.2.4),
+		dplyr,
 		survival,
-		tidyverse,
-		rstanarm,
-		rstan
+		rstanarm
 Imports:purrr,
 		caret,
 		magrittr,

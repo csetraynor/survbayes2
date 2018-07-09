@@ -38,6 +38,7 @@ ic2surv <- ic2surv %>%
 
 #prepare long format dataset
 long_ic2dat <- gen_stan_dat(ic2surv)
+surv_form <- c("mastectomy", "chemotherapy", "age_std", "npi", "hormone_therapy")
 m1.map2stan <- post_surv(x = ic2surv, surv_form = c("kras", "mastectomy", "kras:mastectomy") )
 
 form <- as.formula( paste0(c( "status~1+offset(log_dtime)+s(time)+", paste(surv_form, collapse = "+")), collapse = ""))
@@ -45,7 +46,7 @@ form <- as.formula( paste0(c( "status~1+offset(log_dtime)+s(time)+", paste(surv_
 #prepare long format dataset
 long_x <- gen_stan_dat(x)
 
-m1.stan_gam <- brms::make_stancode( brms::brm(brms::bf(form),
+code_clinical_model <- brms::make_stancode( brms::brm(brms::bf(form),
                  data = long_x, family = poisson() ) )
 
 summary(m1.map2stan)

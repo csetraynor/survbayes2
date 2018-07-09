@@ -2,6 +2,7 @@
 
 export(gen_new.frame)
 export(gen_stan_dat)
+export(gen_stan_surv)
 export(get_bs2)
 export(get_ci2)
 export(get_cindex)
