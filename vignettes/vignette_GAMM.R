@@ -10,15 +10,16 @@ library(tidybayes)
 library(ggplot2)
 library(ggstance)
 library(ggridges)
-library(rstan)
+
 library(rstanarm)
 library(brms)
 library(brmstools)
 import::from(LaplacesDemon, invlogit)
+
+devtools::document()
+library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
-devtools::document()
-
 data("ic2surv")
 ?ic2surv
 
@@ -46,8 +47,10 @@ form <- as.formula( paste0(c( "status~1+offset(log_dtime)+s(time)+", paste(surv_
 #prepare long format dataset
 long_x <- gen_stan_dat(x)
 
-code_clinical_model <- brms::make_stancode( brms::brm(brms::bf(form),
-                 data = long_x, family = poisson() ) )
+clinical_mode_object <- brms::brm(brms::bf(form),
+                 data = long_ic2dat, family = poisson() ) 
+
+code_clinical_mode <- brms::stancode(clinical_mode_object)
 
 summary(m1.map2stan)
 
