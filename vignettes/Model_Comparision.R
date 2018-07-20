@@ -9,9 +9,10 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 ###Load data
-bric_data <- readRDS("/media/mtr/SeagateExpansionDrive/brca_data/bric_data.RDS")
+bric_data <- readRDS("E:/brca_data/bric_data.RDS")
 
 #Preprocess
+
 colnames(bric_data) <- my_replace(colnames(bric_data))
 
 bric_data$mastectomy <-  bric_data$breast_surgery == "MASTECTOMY";
@@ -25,15 +26,33 @@ bric_data$status <- bric_data$os_status == "DECEASED";
 bric_data$time <- bric_data$os_months
 bric_data$time[bric_data$time == 0] <- 1e-3
 #center variables
-bric_data$age_std <- bric_data$age_at_diagnosis - mean(bric_data$age_at_diagnosis) / sd(bric_data$age_at_diagnosis) 
+#bric_data$age_std <- bric_data$age_at_diagnosis - mean(bric_data$age_at_diagnosis) / sd(bric_data$age_at_diagnosis) 
+#bric_data$npi_std <- bric_data$npi - mean(bric_data$npi) / sd(bric_data$npi) 
+if(assertthat::assert_that(all.equal(bric_data$intclust.y,bric_data$intclust.x )) ){
+  bric_data$intclust <- bric_data$intclust.y
+} else {
+  print("Error not equal!")
+}
 
-bric_data_short <- bric_data[, c("age_std", "npi", "mastectomy",
-                         "hormone_therapy", "chemotherapy", "radio_therapy", "her2pos", "erpos", "status", "time")]
+#Apply standardisation to continuos variables
+x$age_std <- ( x$age_at_diagnosis - mean(x$age_at_diagnosis) ) / sd(x$age_at_diagnosis) 
+x$npi_std <- (x$npi - mean(x$npi) ) / sd(x$npi) 
 
-devtools::use_data(bric_data_short)
+#Keep info about training data
+
+train_info <- data.frame("mean_npi" = mean(x$npi),
+                         "sd_npi" = sd(x$npi),
+                         "mean_age" = mean(x$age_at_diagnosis),
+                         "sd_age" = sd(x$age_at_diagnosis))
+saveRDS(train_info, paste0("train_info_clinical", i, ".RDS") )
+
+bric_data_short <- bric_data[, c("age_at_diagnosis", "npi", "her2pos", "erpos", "status", "time",
+                                 "intclust" )]
+
+devtools::use_data(bric_data_short, overwrite = TRUE)
 #create samples
 set.seed(9666)
-mc_samp <- mc_cv(bric_data, strata =  "status", times = 200)
+mc_samp <- mc_cv(bric_data_short, strata =  "status", times = 100)
 
 memory.size(50000)
 # Fit Cox models --------------------

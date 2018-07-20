@@ -1,0 +1,5 @@
+#!/bin/bash
+
+for value in {1..100}
+
+sbatch submitscript$value.txt

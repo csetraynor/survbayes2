@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH -c 6
+#SBATCH --mem-per-cpu=50G
+#SBATCH --time=0-1:30:00     
+#SBATCH --output=my.stdout
+#SBATCH --job-name="job_test"
+ 
+# Put commands for executing job below this line
+# This example is loading Python and then
+# writing out the version of Python
+
+module load R
+R CMD BATCH vignettes/parallel.R
