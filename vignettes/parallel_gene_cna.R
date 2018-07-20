@@ -56,11 +56,26 @@ assertthat::assert_that(all.equal(patient_id, patient_id_cna))
 ##Transpose cna expression matrix
 colnames(cna_matrix) <- NULL
 cna_matrix <- t(cna_matrix)
+colnames(cna_matrix) <- cna_names
+##Check zero var
+
+test <- caret::nearZeroVar(cna_matrix)
+if(length(test) > 0){
+  cna_matrix <- cna_matrix[ ,-test]
+}
+
+#Convert to factor
 cna_matrix <- as.data.frame(cna_matrix)
+cna_matrix <- lapply(cna_matrix, as.factor)
+cna_matrix <- do.call(cbind.data.frame, cna_matrix)
+#add NA as factor
+cna_matrix <- lapply(cna_matrix, addNA)
+cna_matrix <- do.call(cbind.data.frame, cna_matrix)
 
-cna_matrix <- cna_matrix %>% dplyr::mutate_all(as.factor)
+glimpse(cna_matrix)
 
-X <- model.matrix( ~ ., cna_matrix[,1:10])[,-1]
+#Create model matrix
+X <- model.matrix( ~ ., cna_matrix[,1:10])[ ,-1]
 
 X <- as.data.frame(X)
 
@@ -70,15 +85,15 @@ for(i in 11:ncol(cna_matrix)){
   if(nlevels(cna_matrix[,i]) > 1){
     coluna <- as.data.frame(cna_matrix[,i])
     colnames(coluna) <- colnames(cna_matrix[i])
-    matrixna <- model.matrix(~ ., coluna)[,-1]
+    matrixna <- model.matrix(~ ., coluna)[ ,-1]
     matrixna <- as.data.frame(matrixna)
-    print(colnames(matrixna))
     X <- cbind(X, matrixna)
   }
   #Transform to numeric
   else{
     coluna <- as.numeric(as.factor(cna_matrix[,i]))
     coluna <- as.data.frame(coluna)
+    print(coluna)
     colnames(coluna) <- colnames(cna_matrix[i])
     X <-cbind(X, coluna)
   }
@@ -86,14 +101,15 @@ for(i in 11:ncol(cna_matrix)){
 
 
 cna_matrix <- as.data.frame(X)
+
+
+#add patient id
 cna_matrix$patient_id <- patient_id_cna
 
-##Check zero var
-
-test <- zeroVar(t_cna_expression)
+test <- caret::nearZeroVar(cna_matrix)
 if(length(test) > 0){
-  t_cna_expression <- t_cna_expression[,-test]
+  cna_matrix <- cna_matrix[ ,-test]
 }
 
-saveRDS(t_cna_expression, "/home/mtr/rfactory/cna_expression.RDS")
+saveRDS(cna_matrix, "cna_matrix.RDS")
 
