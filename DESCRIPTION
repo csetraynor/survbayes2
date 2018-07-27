@@ -12,7 +12,8 @@ LazyData: true
 Depends: R (>= 3.2.4),
 		dplyr,
 		survival,
-		rstanarm
+		rstanarm,
+		pec
 Imports:purrr,
 		caret,
 		magrittr,

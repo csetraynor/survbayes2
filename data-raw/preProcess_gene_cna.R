@@ -20,19 +20,19 @@ patient_id <- colnames(gene_matrix)
 colnames(gene_matrix) <- NULL
 gene_matrix <- t(gene_matrix)
 str(gene_matrix)
-
-# Normalise gene matrix
 colnames(gene_matrix) <- gene_names
-preProcGeneValues <- caret::preProcess(gene_matrix, method = c("center", "scale", "knnImpute") )
-gene_matrix <- predict(preProcGeneValues, gene_matrix)
-saveRDS(preProcGeneValues, paste0("trainTransformed_clin", i, ".RDS") ); rm(preProcGeneValues)
-
-# Impute Gene matrix
-gene_matrix <- impute::impute.knn(gene_matrix, k = 10)$data
-
-# add patient id
 gene_matrix <- as.data.frame(gene_matrix)
 gene_matrix$patient_id <- patient_id
+devtools::use_data(gene_matrix, overwrite = TRUE)
+
+# Normalise gene matrix
+preProcGeneValues <- caret::preProcess(gene_matrix, method = c("center", "scale", "knnImpute") )
+gene_matrix <- predict(preProcGeneValues, gene_matrix)
+saveRDS(preProcGeneValues, paste0("trainTransformed_gene_sample", i, ".RDS") ); rm(preProcGeneValues)
+
+# Impute Gene matrix
+# gene_matrix <- impute::impute.knn(gene_matrix, k = 10)$data
+
 str(gene_matrix)
 
 
@@ -112,7 +112,8 @@ if(length(test) > 0){
 }
 
 saveRDS(cna_matrix, "cna_matrix.RDS")
-
+cna_matrix <- readRDS("E:/brca_data/cna_matrix.RDS")
+devtools::use_data(cna_matrix)
 ###Load data
 bric_data <- readRDS("E:/brca_data/bric_data.RDS")
 
@@ -140,7 +141,7 @@ if(assertthat::assert_that(all.equal(bric_data$intclust.y,bric_data$intclust.x )
   print("Error not equal!")
 }
 
-bric_data_clinical <- bric_data[, c("age_at_diagnosis", "npi", "her2pos", "erpos", "status", "time","intclust" )]
+bric_data_clinical <- bric_data[, c("patient_id","age_at_diagnosis", "npi", "her2pos", "erpos", "status", "time","intclust" )]
 
 #Transform intclust
 unique(bric_data_clinical$intclust)
@@ -150,3 +151,14 @@ bric_data_clinical$intclust_int <- as.numeric(bric_data_clinical$intclust_fact)
 
 devtools::use_data(bric_data_clinical, overwrite = TRUE)
 saveRDS(bric_data_clinical, "E:/brca_data/bric_data_clinical.RDS")
+
+
+#create samples
+set.seed(9666)
+mc_samp <- rsample::mc_cv(bric_data_clinical, strata =  "status", times = 100)
+saveRDS(mc_samp, "E:/brca_data/mc_samp.RDS")
+devtools::use_data(mc_samp, overwrite = TRUE)
+
+data("mc_samp")
+
+

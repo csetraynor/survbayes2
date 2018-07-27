@@ -74,7 +74,6 @@ mc_samp$mod_gen_cox <- pmap(list(mc_samp$splits),
 
 # Fit Bayes models --------------------
 #Create fit object 
-stan_model_object <- 
 
 mc_samp$mod_clin_bym <- pmap(list(mc_samp$splits),
                              function(splits){

@@ -35,8 +35,63 @@ post_surv <- function(x, surv_form, prior = NULL, ...) {
   return(m1.stan_gam)
 }
 
+#' Prediction of Survival probability from a Bayesian model
+#'
+#'
+#' Predicts the survival probability for each drawn of the posterior distribution.
+#'
+#' @param x data
+#' @param bgam Bayesian Generalized Additive Models
+#' @param preProcess Pre-processing information from training set to Test set.
+#' @param ... Ignored
+#' @return mod
+#' @seealso [gamair]
+#' @keywords gamair
+#'
+#' @author Carlos S Traynor
+#' @references
+#'
+#'  Wood, S.N. (2006) Generalized Additive Models: An Introduction with R 
+#'  Chapman & Hall/CRC, Boca Raton, Florida. ISBN 1-58488-474-6
+#'@export surv_pred_bgam
 
+surv_pred_bgam <- function(x, bgam, preProcValues = NULL, ...) {
+  train_data <- rsample::analysis(x)
+  
+  #get timepoints
+  timepoints <-  seq(0, max(train_data$time),
+                     length.out = 100L)
+  
+  test_data <- rsample::assessment(x)
+  
+  #Standardise test data 
+  if(is.null(preProcValues)){
+    preProcValues <- caret::preProcess(train_data[c("age_at_diagnosis", "npi")],
+                                       method = c("center", "scale") )
+  }
 
+  testTransformed <- predict(preProcValues, test_data[c("age_at_diagnosis", "npi")])
+  colnames(testTransformed) = c("age_std", "npi_std")
+  
+  test_data <- cbind(test_data, testTransformed)
+  
+  #get new dataset
+  newdat <-  gen_new.frame(dat = test_data, timepoints = timepoints)
+  
+  # get surv formula
+  form <-  names(bgam$coefficients)
+  toMatch <- c(":", "Intercept", "s\\(time")
+  toMatch <- form[ !grepl(paste(toMatch,collapse="|"), 
+                               form) ]
+  surv_form <- gsub("TRUE", "", toMatch)
+  
+  newdat <- newdat[ ,match(c(surv_form, "log_dtime", "time", "sample_id"), colnames(newdat))]
+  #predict linear predictor
+  post <- suppressWarnings(posterior_linpred(bgam, newdata = newdat) )
+  pred_frame <- pred_surv(post = post, longdata = newdat)
+  
+  pred_frame
+}
 #' Prediction of survival from model
 #'
 #'
@@ -65,6 +120,9 @@ pred_sbm <- function(x, surv_form, prior = NULL, ...) {
                      length.out = 100L)
   
   test_data <- rsample::assessment(x)
+  
+  
+  
   newdat <-  gen_new.frame(dat = test_data, timepoints = timepoints)
   newdat <- newdat[ ,match(c(surv_form[!grepl(":", surv_form)], "log_dtime", "time", "sample_id"), colnames(newdat))]
   post <- suppressWarnings(posterior_linpred(model.map2stan, newdata = newdat) )
@@ -90,9 +148,10 @@ pred_sbm <- function(x, surv_form, prior = NULL, ...) {
 #'  Terry M. Therneau and Patricia M. Grambsch (2000).
 #'   Modeling Survival Data: Extending the Cox Model.
 #'   Springer, New York. ISBN 0-387-98784-3.
+#'@importFrom prodlim Hist
 #'@export  get_bs2
 
-get_bs2 <- function(pred_frame, x ) {
+get_bs2 <- function(pred_frame, x, surv_form , preProcValues = NULL) {
 
   train_data <- rsample::analysis(x)
   
@@ -100,6 +159,17 @@ get_bs2 <- function(pred_frame, x ) {
                      length.out = 100L)
   
   test_data <- rsample::assessment(x)
+  #Standardise test data 
+  if(is.null(preProcValues)){
+    preProcValues <- caret::preProcess(train_data[c("age_at_diagnosis", "npi")],
+                                       method = c("center", "scale") )
+  }
+  
+  testTransformed <- predict(preProcValues, test_data[c("age_at_diagnosis", "npi")])
+  colnames(testTransformed) = c("age_std", "npi_std")
+  
+  test_data <- cbind(test_data, testTransformed)
+  
   newdat <-  gen_new.frame(dat = test_data, timepoints = timepoints)
   newdat <- newdat[ ,match(c(surv_form[!grepl(":", surv_form)], "log_dtime", "time", "sample_id"), colnames(newdat))]
   

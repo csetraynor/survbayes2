@@ -4,7 +4,7 @@
 \alias{get_bs2}
 \title{Get brier score}
 \usage{
-get_bs2(pred_frame, x)
+get_bs2(pred_frame, x, surv_form, preProcValues = NULL)
 }
 \arguments{
 \item{x}{data}
