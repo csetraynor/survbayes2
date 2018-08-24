@@ -5,9 +5,9 @@
 \alias{get_cindex}
 \title{Get c-index}
 \usage{
-get_cindex(x, mod, ...)
+get_cindex(test, mod, time = "time", status = "status", Unix = FALSE)
 
-get_cindex(x, mod, ...)
+get_cindex(test, mod, time = "time", status = "status", Unix = FALSE)
 }
 \arguments{
 \item{mod}{Coxph model object fitted with coxph (survival).}

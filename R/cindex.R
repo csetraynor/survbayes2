@@ -36,23 +36,67 @@ get_cindex <- function(data, mod,...)
 #' @export
 #' @rdname get_cindex
 get_cindex <-
-  function(x, mod, ...) {
+  function(test, mod, time = "time", status = "status", Unix = FALSE){
     
-    train_data <- rsample::analysis(x)
+    timepoints <-   spc::quadrature.nodes.weights(100, type="GL", x1= 0 , x2= max(test[[time]][test[[status]] ]) )$nodes
     
-    timepoints <-  seq(0, max(train_data$time),
-                       length.out = 100L)
-    
-    test_data <- rsample::assessment(x)
-    
-    
-    tail(suppressWarnings(suppressMessages( (pec::cindex(mod, 
-                                        Surv(time, status) ~ 1,
-                                        data = test_data,
+    if(any( class(mod)  == "coxph") ){
+      probs <- pec::predictSurvProb(mod, newdata = test, times = timepoints)
+      
+      statistic <- suppressMessages( pec::cindex(probs, 
+                                    Surv(time, status) ~ 1,
+                                    data = test,
                                     pred.times = timepoints,
-               eval.times = timepoints))))$AppCindex$coxph , n=1)
+                                    eval.times = timepoints ) )
+      
+      apperror <- unlist(statistic$AppCindex)
+      time <- timepoints
+      concordance <-  tail(apperror, n = 1)
+      ref <- 0.5
+      out <- list(concordance, apperror, ref, time)
+      names(out) <- c( "concordance", "apperror", "reference","time")
+      
+      out
+      
+    } else {
+      if(any( class(mod) == "stanreg" ) ){
+        
+        newdat <-  gen_new_frame(dat = test,
+                                 timepoints = timepoints)
+        pred_frame <- pred_surv(long_x = newdat, 
+                                mod = mod,
+                                unix = Unix)
+        
+        models.cindex <- lapply(seq_along(colnames(pred_frame)), function(i){
+          newdat$surv <- as.vector( pred_frame[ ,i] ) 
+          
+          probs <- get_survProb(newdat = newdat)
+          
+          c.index <-       suppressMessages( pec::cindex(probs, 
+                                                       Surv(time, status) ~ 1,
+                                                       data = test,
+                                                       pred.times = timepoints,
+                                                       eval.times = timepoints ) )
+          c.index
+        })
+        models.cindex.app <- lapply(models.brier, function(b){
+          b$AppCindex
+        })
+        models.concordance <- sapply(models.cindex.app, function(b){
+          tail(unlist(b), n = 1)
+        })
+        models.cindex.app <- do.call(cbind, models.cindex.app )
+        apperror <- apply(models.cindex.app, 1, mean)
+        time <- timepoints
+        concordance <- mean(models.concordance)
+        ref <- 0.5
+        out <- list(concordance, apperror, ref, time)
+        names(out) <- c( "concordance", "apperror", "reference","time")
+        
+        out
+        
+      } else {
+        "Print object must be either coxph or stanreg"
+      }
+    }
   }
-
-
-
-

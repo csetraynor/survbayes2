@@ -8,7 +8,7 @@
 #' @return d a plot dataset
 #' @export
 #' @importFrom magrittr %>%
-get_plot.frame <- function(post, strata, obs = ic2surv){
+get_plot.frame <- function(post, strata, obs ){
   plot.frame <- tibble::tibble(
     postmean = apply(plot.matrix, 1, mean),
     lower = apply(plot.matrix, 1, quantile, probs = 0.055),
@@ -28,8 +28,8 @@ get_plot.frame <- function(post, strata, obs = ic2surv){
   plot.frame
 }
 
-get_km.frame <- function(obs, strata ){
-  form <- as.formula(paste0("Surv( time , status) ~ ", paste(strata, collapse = "+")))
+get_km.frame <- function(obs, strata, time = "time", status = "status"){
+  form <- as.formula(paste0("Surv(", time, ",", status, ") ~ ", paste(strata, collapse = "+")))
   mle.surv <- survfit(form, data = obs  )
   obs.mortality <- data.frame(time = mle.surv$time,
                               surv = mle.surv$surv,
@@ -54,10 +54,11 @@ get_km.frame <- function(obs, strata ){
 #' @return d a plot dataset
 #' @export
 #' @importFrom magrittr %>%
-get_plot_new_frame <- function(mod,newdat, timepoints, treatment){
-  post <- suppressWarnings(rstanarm::posterior_linpred(mod, newdata = newdat))
-  
-  survdata <- apply(post, MARGIN = 1, get_survival_function)
+get_plot_frame <- function(mod, x = NULL, long_x = NULL, treatment = NULL, time = "time", status = "status", unix = FALSE){
+  if(is.null(long_x) ) {
+    long_x <- gen_stan_dat(x, time = time, status = status)
+  }
+  survdata <- pred_surv(mod = mod, long_x = long_x, unix = unix)
   
   mean.surv <- apply(survdata, MARGIN = 1, mean)
   mean.upper <- apply(survdata, 1, quantile, 0.945)
@@ -67,9 +68,13 @@ get_plot_new_frame <- function(mod,newdat, timepoints, treatment){
     survmean = c(1, mean.surv),
     survlower = c(1, mean.lower),
     survupper = c(1, mean.upper),
-    time = c(0, newdat$time)
-  ) %>%
-    dplyr::mutate(Treatment = treatment)
+    time = c(0, long_x$time)
+  ) 
+  
+  if(!is.null(treatment)) {
+    bc.plot <-  bc.plot %>%
+      dplyr::mutate(Treatment = treatment)
+  }
   bc.plot
 }
 

@@ -23,6 +23,8 @@ plot_km <- function(dat, time = time, status = status, event_type = 1, strata = 
     geom_step()
 }
 
+
+
 #' Generate data for stan
 #'
 #' This function generates a long format dataframe for
@@ -30,28 +32,77 @@ plot_km <- function(dat, time = time, status = status, event_type = 1, strata = 
 #'
 #' @param d a dataset \cr
 #' @return d a long dataset
-#' @export
+#' @export gen_stan_dat
 #' @importFrom rlang !!
 #' @importFrom magrittr %>%
-gen_stan_surv <- function(dat, status = "status", time = "time", timepoints = T) {
+gen_stan_dat <- function(dat, status = "status", time = "time", timepoints = T) {
   # prepare for longdat formating
-  dat$sample_id <- 1:nrow(dat)  #create sample id
+  dat$numeric_id <- 1:nrow(dat)  #create sample id
   # get unique times: only event times equivalent to Cox model
   if(length(timepoints) > 1 ){
-    times <- timepoints
+    nodes <- timepoints
   } else{
-    times <- dat[dat[[status]], ]
-    times <- times[order(unique(unlist(times[, time]))), time]
+    timepoints <- dat[dat[[status]], ]
+    times <- sort( unique( timepoints[[time]] ) )
+     nodes <- spc::quadrature.nodes.weights(10, type="GL", x1=min(times), x2=max(times) )$nodes
+    # print(nodes)
+    #  nodes <- ceiling(seq(1, length(times), length.out = 10))
+    # # 
+    # timepoints <- times[nodes]
+    # nodes <- geomSeries(2, max(times))
   }
   form <- as.formula(paste0("Surv(", time, " ,", status, " )", "~."))
-  longdat <- survival::survSplit(form, data = dat, cut = times)
+  longdat <- survival::survSplit(form, data = dat, cut = nodes)
   # create time point id
-  longdat <- longdat %>% dplyr::group_by(sample_id) %>% dplyr::mutate(t_id = seq(n()))
+  longdat <- longdat %>% dplyr::group_by(numeric_id) %>% dplyr::mutate(t_id = seq(n()))
   # calculate log duration for off-set variable
-  longdat$dtime <- longdat[time] - longdat[["tstart"]]
+  longdat$dtime <- longdat[[time]] - longdat[["tstart"]]
   longdat$log_dtime <- as.double( unlist( log(longdat$dtime) ) )
   longdat
 }
+
+geomSeries <- function(base, max) {
+  base^(0:floor(log(max, base)))
+}
+
+
+
+#' Generate long data format for stan
+#'
+#' This function generates a long format dataframe for
+#' repeated tte, time dependent covariates.
+#'
+#' @param d a dataset \cr
+#' @return d a long dataset
+#' @export gen_long_dat
+#' @importFrom rlang !!
+#' @importFrom magrittr %>%
+gen_long_dat <- function(dat, status = "status", time = "time") {
+  # prepare for longdat formating
+  dat$numeric_id <- 1:nrow(dat)  #create sample id
+  
+  long_time <- lapply(seq_along(dat$numeric_id), function(i){
+    obs_time = dat[i, time]
+    obs_status = dat[i, status]
+    dummy_time = spc::quadrature.nodes.weights(10, type="GL", x1= 0 , x2= obs_time )$nodes
+    dummy_status = rep(0, 10)
+    data.frame(numeric_id = i,
+               time = c(dummy_time, obs_time),
+               status = c(dummy_status, obs_status),
+               dtime = diff(c(0,dummy_time, obs_time )))
+  } )
+  
+  long_dat <- do.call(rbind.data.frame, long_time)
+  long_dat$log_dtime <- log(long_dat$dtime)
+  
+  dat[time] <- NULL
+  dat[status] <- NULL
+  
+  merge(dat, long_dat, by = "numeric_id")
+}
+
+
+
 #' String method for strata in surv analysis
 #'
 #' This function is a string method to facilitate ploting.
@@ -79,7 +130,7 @@ str_strata <- function(c){
 #' @return d a long dataset
 #' @export
 #' @importFrom magrittr %>%
-gen_new.frame <- function(dat, time = "time", id = "patient_id", timepoints){
+gen_new_frame <- function(dat, time = "time", id = "patient_id", timepoints){
 
   
   data_cal <- lapply(seq_along( dat[[id]] ), function(x) {
@@ -145,4 +196,34 @@ Ops.formula <- function(e1, e2){
     return(out)
   }
   else stop('can not yet subtract formula objects')
+}
+
+resample <- function(x, ...) x[sample.int(length(x), ...)]
+
+resample_stratified <- function(x, sizeto = NULL, strata = NULL, replace_logic = F){
+  if(is.null(strata) | is.null(sizeto)){
+    stop(print( "Error strata and sizeto should be specified") )
+  }else{
+    splits <- lapply(seq_along(strata), function(z){
+      sizeto <- floor( sizeto / length(unique(x[[strata[z] ]])) / length(strata) ) 
+      splits_k <- lapply(unlist( unique(x[[strata[z] ]]) ), function(i){
+        probabilities <-  rep(0, nrow(x))
+        probabilities[ grep(i, x[[strata[z] ]])] <- 1 
+        x[resample(x = 1:nrow(x), size = sizeto, replace = replace_logic,
+                   prob = probabilities), ]
+      })
+      do.call(rbind, splits_k)
+    })
+    do.call(rbind, splits)
+  }
+}
+
+
+convert_blank_to_na <- function(x) {
+  if(!purrr::is_character(x)){
+    return(x)
+    print("Error not character")
+  } else {
+    ifelse(x == "" | x == "[Not Available]" | x == "--" | x == "not reported" | x == "[Not Applicable]", NA, x)
+  }
 }

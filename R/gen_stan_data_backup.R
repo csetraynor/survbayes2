@@ -8,13 +8,14 @@
 #' @export
 #' @importFrom rlang !!
 #' @importFrom magrittr %>%
-gen_stan_dat_backup <- function(x, status = "status", time = "time") {
+gen_stan_dat_bakckup <- function(x, status = "status", time = "time") {
   # prepare for longdat formating
   x$sample_id <- 1:nrow(x)  #create sample id
   # get unique times: only event times equivalent to Cox model
   x <- x[order(x$time), ]
   times <- x[x[["status"]], ]
-  time_points <- times[order(unique(unlist(times[, "time"]))), "time"]
+  time_points <- as.vector( unlist( times[order(unique(unlist(times[, "time"]))), "time"] ) )
+
   dtime_points <- diff(c(0, time_points))
   x$t_observed <- x$time
   x$time <- NULL

@@ -1,3 +1,4 @@
+# !diagnostics off
 library(iclust2prog)
 library(predsurv)
 library(magrittr)
@@ -58,7 +59,7 @@ summary(m1.map2stan)
 #Conterfactual plot
 
 timepoints = seq(min(ic2surv$time), max(ic2surv$time), length.out = 100)
-dtime = c(0, diff(timepoints))
+dtime = diff(c(0, timepoints) )
 bcdata <- data.frame(
   time = timepoints,
   log_dtime = log(dtime), 

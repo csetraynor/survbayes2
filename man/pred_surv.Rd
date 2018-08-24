@@ -4,7 +4,8 @@
 \alias{pred_surv}
 \title{Posterior prediction of survival outcome}
 \usage{
-pred_surv(post, longdata)
+pred_surv(x = NULL, long_x = NULL, mod, unix = FALSE,
+  patient_id = "patient_id")
 }
 \arguments{
 \item{post}{posterior draws in matrix format \cr}
